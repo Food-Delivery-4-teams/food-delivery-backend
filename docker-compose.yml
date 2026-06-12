@@ -1,0 +1,84 @@
+services:
+  postgres:                                          # AWS RDS/ Cloud SQL
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G 
+
+  redis:                                        #ElasticCache/MemoryStore
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  minio:                                        # S3/Cloud Storage
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER = ${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD = ${MINIO_ROOT_PASSWORD}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["miniodata:/data"]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+  
+  minio-init:                  # Auto create bucket on first start
+    image: minio/mc
+    depends_on: 
+      minio:
+        condition: service_started
+    entrypoint: /bin/sh /init/minio-init.sh
+    volumes: ["./init/minio:/init"]
+    restart: on-failure
+
+  mailhog:                            #SES / Sendgrid (Email Testing)
+    image: mailhog/mailhog
+    ports: ["1025:1025", "8025:8025"]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+
+  adminer:                            # Adminer forDB management
+    image: adminer
+    ports: ["8080:8080"]
+volumes:
+  pgdata:
+  miniodata:
+
+
+
+
+
+  
+
+
+
+
